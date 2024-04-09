@@ -8,11 +8,12 @@ import os.path
 try:
     from cStringIO import StringIO
 except ImportError:
-    from StringIO import StringIO
+    from io import StringIO
 
 import numpy as np
 import PIL.Image
 import scipy.misc
+
 
 # Library defaults:
 #   PIL.Image:
@@ -47,9 +48,9 @@ def load_image(path):
             image = PIL.Image.open(path)
             image.load()
         except IOError as e:
-            raise errors.LoadImageError, 'IOError: %s' % e.message
+            raise Exception('IOError: %s' % e.message)
     else:
-        raise errors.LoadImageError, '"%s" not found' % path
+        raise Exception('"%s" not found' % path)
 
     if image.mode in ['L', 'RGB']:
         # No conversion necessary
@@ -71,7 +72,7 @@ def load_image(path):
         new.paste(image, mask=image.convert('RGBA'))
         return new
     else:
-        raise errors.LoadImageError, 'Image mode "%s" not supported' % image.mode
+        raise Exception('Image mode "%s" not supported' % image.mode)
 
 def upscale(image, ratio):
     """
@@ -389,9 +390,9 @@ def vis_square(images,
         # they're grayscale - convert to a colormap
         redmap, greenmap, bluemap = get_color_map(colormap)
 
-        red = np.interp(images*(len(redmap)-1)/255.0, xrange(len(redmap)), redmap)
-        green = np.interp(images*(len(greenmap)-1)/255.0, xrange(len(greenmap)), greenmap)
-        blue = np.interp(images*(len(bluemap)-1)/255.0, xrange(len(bluemap)), bluemap)
+        red = np.interp(images*(len(redmap)-1)/255.0, range(len(redmap)), redmap)
+        green = np.interp(images*(len(greenmap)-1)/255.0, range(len(greenmap)), greenmap)
+        blue = np.interp(images*(len(bluemap)-1)/255.0, range(len(bluemap)), bluemap)
 
         # Slap the channels back together
         images = np.concatenate( (red[...,np.newaxis], green[...,np.newaxis], blue[...,np.newaxis]), axis=3 )
@@ -455,7 +456,7 @@ def get_color_map(name):
         bluemap = [1, 0.5]
     else:
         if name != 'jet':
-            print 'Warning: colormap "%s" not supported. Using jet instead.' % name
+            print('Warning: colormap "%s" not supported. Using jet instead.' % name)
         redmap      = [0,0,0,0,0.5,1,1,1,0.5]
         greenmap    = [0,0,0.5,1,1,1,0.5,0,0]
         bluemap     = [0.5,1,1,1,0.5,0,0,0,0]

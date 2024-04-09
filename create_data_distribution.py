@@ -63,7 +63,7 @@ def distribute_buckets(BUCKETS, train_probability):
 for data_type in glob.glob(INPUT_FOLDER +"/*"):
 	
 	data_type_name = data_type.split("/")[-1]	
-	print data_type_name
+	print(data_type_name)
 
 	BUCKETS = {}
 	all_images = glob.glob(data_type+"/*/*")
@@ -106,18 +106,18 @@ for data_type in glob.glob(INPUT_FOLDER +"/*"):
 
 
 		train, test = CANDIDATE_DISTRIBUTIONS[np.argmax(CANDIDATE_VARIANCES)]
-		print len(train)
-		print len(test)
+		print(len(train))
+		print(len(test))
 		
 		train_dist = compute_per_class_distribution(train)
 		test_dist =  compute_per_class_distribution(test)
 		spread_data = []
 		for _key in train_dist:
-			print _key, train_dist[_key] * 1.0 /(train_dist[_key]+test_dist[_key])
+			print(_key, train_dist[_key] * 1.0 /(train_dist[_key]+test_dist[_key]))
 			spread_data.append(train_dist[_key] * 1.0 /(train_dist[_key]+test_dist[_key]))
 
-		print "Mean :: ", np.mean(spread_data)
-		print "Variance: ", np.var(spread_data)
+		print("Mean :: ", np.mean(spread_data))
+		print("Variance: ", np.var(spread_data))
 		
 		target_folder_name = data_type_name + "-" + str(int(math.ceil(train_prob*100)))+"-"+str(int(math.ceil((1-train_prob)*100)))
 
@@ -132,7 +132,7 @@ for data_type in glob.glob(INPUT_FOLDER +"/*"):
 				labels_map[_entry[1]] += 1
 			except:
 				labels_map[_entry[1]] = 1
-		print labels_map
+		print(labels_map)
 		labels_list = sorted(labels_map.keys())
 
 		f = open(OUTPUT_FOLDER+"/"+target_folder_name+"/train.txt","w")

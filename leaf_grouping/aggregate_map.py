@@ -27,7 +27,7 @@ for _csvfile in glob.glob("filtered_leafmaps/*.csv"):
 
 for _key in MAP.keys():
 	if len(MAP[_key])>1:
-		print _key, " ------ ", MAP[_key]
+		print(_key, " ------ ", MAP[_key])
 
 
 import json
