@@ -3,33 +3,24 @@
 
 import argparse
 from collections import Counter
-import logging
 import math
 import os
 import queue
 import random
 import re
 import shutil
-import sys
 import threading
 import time
 import torch
-#import utils
 
-# Find the best implementation available
 try:
     from cStringIO import StringIO
 except ImportError:
     from io import StringIO, BytesIO
 
 import h5py
-import lmdb
 import numpy as np
 import PIL.Image
-
-# must call digits.config.load_config() before caffe to set the path
-# import caffe.io
-# from caffe.proto import caffe_pb2
 
 from utils import image_processor
 
@@ -293,11 +284,7 @@ def create_db(input_file, output_dir,
 
     start = time.time()
 
-    if backend == 'lmdb':
-        _create_lmdb(image_count, write_queue, batch_size, output_dir,
-                summary_queue, num_threads,
-                mean_files, **kwargs)
-    elif backend == 'hdf5':
+    if backend == 'hdf5':
         _create_hdf5(image_count, write_queue, batch_size, output_dir,
                 image_width, image_height, image_channels,
                 summary_queue, num_threads,
@@ -306,83 +293,6 @@ def create_db(input_file, output_dir,
         raise ValueError('invalid backend')
 
     logger.info('Database created after %d seconds.' % (time.time() - start))
-
-def _create_lmdb(image_count, write_queue, batch_size, output_dir,
-        summary_queue, num_threads,
-        mean_files      = None,
-        encoding        = None,
-        lmdb_map_size   = None,
-        **kwargs):
-    """
-    Create an LMDB
-
-    Keyword arguments:
-    encoding -- image encoding format
-    lmdb_map_size -- the initial LMDB map size
-    """
-    wait_time = time.time()
-    threads_done = 0
-    images_loaded = 0
-    images_written = 0
-    image_sum = None
-    batch = []
-    compute_mean = bool(mean_files)
-
-    db = lmdb.open(output_dir,
-            map_size=lmdb_map_size,
-            map_async=True,
-            max_dbs=0)
-
-    while (threads_done < num_threads) or not write_queue.empty():
-
-        # Send update every 2 seconds
-        if time.time() - wait_time > 2:
-            logger.debug('Processed %d/%d' % (images_written, image_count))
-            wait_time = time.time()
-
-        processed_something = False
-
-        if not summary_queue.empty():
-            result_count, result_sum = summary_queue.get()
-            images_loaded += result_count
-            # Update total_image_sum
-            if compute_mean and result_count > 0 and result_sum is not None:
-                if image_sum is None:
-                    image_sum = result_sum
-                else:
-                    image_sum += result_sum
-            threads_done += 1
-            processed_something = True
-
-        if not write_queue.empty():
-            datum = write_queue.get()
-            batch.append(datum)
-
-            if len(batch) == batch_size:
-                _write_batch_lmdb(db, batch, images_written)
-                images_written += len(batch)
-                batch = []
-            processed_something = True
-
-        if not processed_something:
-            time.sleep(0.2)
-
-    if len(batch) > 0:
-        _write_batch_lmdb(db, batch, images_written)
-        images_written += len(batch)
-
-    if images_loaded == 0:
-        raise LoadError('no images loaded from input file')
-    logger.debug('%s images loaded' % images_loaded)
-
-    if images_written == 0:
-        raise WriteError('no images written to database')
-    logger.info('%s images written to database' % images_written)
-
-    if compute_mean:
-        _save_means(image_sum, images_written, mean_files)
-
-    db.close()
 
 def _create_hdf5(image_count, write_queue, batch_size, output_dir,
         image_width, image_height, image_channels,
@@ -571,12 +481,14 @@ def _load_thread(load_queue, write_queue, summary_queue,
         except queue.Empty:
             continue
 
-        # prepend path with image_folder, if appropriate
-        #if not utils.is_url(path) and image_folder and not os.path.isabs(path):
-        #    path = os.path.join(image_folder, path)
-
+        base_dir = "C:\\Users\\hp\\Desktop\\plantvillage_deeplearning_paper_dataset-master\\raw\\color"
+        full_path = ""
+        for dir_path, dir_names, file_names in os.walk(base_dir):
+            for file in file_names:
+                if file.endswith(path):
+                    full_path = os.path.join(dir_path, file)
         try:
-            image = image_processor.load_image(path)
+            image = image_processor.load_image(full_path)
         except Exception as e: 
             logger.warning('[%s] %s: %s' % (path, type(e).__name__, e) )
             continue
@@ -586,7 +498,7 @@ def _load_thread(load_queue, write_queue, summary_queue,
                 channels    = image_channels,
                 resize_mode = resize_mode,
                 )
-    #image = image.resize((256, 256), PIL.Image.ANTIALIAS)
+        #image = image.resize((256, 256), PIL.Image.ANTIALIAS)
 
         if compute_mean:
             image_sum += image
@@ -651,32 +563,6 @@ def _array_to_datum(image, label, encoding):
         datum['data'] = s.getvalue()
         datum['encoded'] = True
     return datum
-
-def _write_batch_lmdb(db, batch, image_count):
-    """
-    Write a batch to an LMDB database
-    """
-    try:
-        with db.begin(write=True) as lmdb_txn:
-            for i, datum in enumerate(batch):
-                key = '%08d_%d' % (image_count + i, datum.label)
-                lmdb_txn.put(key, datum.SerializeToString())
-
-    except lmdb.MapFullError:
-        # double the map_size
-        curr_limit = db.info()['map_size']
-        new_limit = curr_limit*2
-        logger.debug('Doubling LMDB map size to %sMB ...' % (new_limit>>20,))
-        try:
-            db.set_mapsize(new_limit) # double it
-        except AttributeError as e:
-            version = tuple(int(x) for x in lmdb.__version__.split('.'))
-            if version < (0,87):
-                raise Error('py-lmdb is out of date (%s vs 0.87)' % lmdb.__version__)
-            else:
-                raise e
-        # try again
-        _write_batch_lmdb(db, batch, image_count)
 
 def _save_means(image_sum, image_count, mean_files):
     """
@@ -772,6 +658,7 @@ if __name__ == '__main__':
         args['lmdb_map_size'] <<= 20
 
     try:
+
         create_db(args['input_file'], args['output_dir'],
                 args['width'], args['height'], args['channels'],
                 args['backend'],
@@ -785,6 +672,6 @@ if __name__ == '__main__':
                 hdf5_dset_limit = args['hdf5_dset_limit'],
                 )
     except Exception as e:
-        logger.error('%s: %s' % (type(e).__name__, e.message))
+        logger.error('%s' % (type(e).__name__))
         raise
 

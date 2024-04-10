@@ -36,7 +36,7 @@ def write_data(filename, data):
             file.write(line + "\n")
             prev_prefix = current_prefix
 
-write_data('train.txt', train_data)
-write_data('test.txt', test_data)
+write_data('hdf5/color-80-20/train.txt', train_data)
+write_data('hdf5/color-80-20/test.txt', test_data)
 
 print("The dataset was split into train.txt and test.txt")
